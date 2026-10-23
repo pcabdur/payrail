@@ -1,0 +1,19 @@
+export default function Home() {
+  return (
+    <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 py-16">
+      <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">
+        PayRail
+      </p>
+      <h1 className="mt-4 text-4xl font-semibold tracking-tight">
+        Stablecoin payments, built on reliable rails.
+      </h1>
+      <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-600">
+        The development workspace is ready. Payment, settlement, and account
+        features are not implemented yet.
+      </p>
+      <p className="mt-8 text-sm text-slate-500">
+        Platform scaffold · Development
+      </p>
+    </main>
+  );
+}
