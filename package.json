@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "packageManager": "pnpm@9.15.9",
   "scripts": {
-    "dev:web": "pnpm --filter @payrail/web dev -- --port 3001",
+    "dev:web": "pnpm --filter @payrail/web exec next dev -p 3001",
     "build:web": "pnpm --filter @payrail/web build",
     "lint": "pnpm --recursive lint",
     "format:check": "prettier --check .",
