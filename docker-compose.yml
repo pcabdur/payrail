@@ -1,0 +1,131 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-payrail}:${POSTGRES_PASSWORD:-payrail_dev_only}@postgres:5432/${POSTGRES_DB:-payrail}
+      REDIS_URL: redis://redis:6379/0
+      BASE_SEPOLIA_RPC_URL: ${BASE_SEPOLIA_RPC_URL:-}
+      PAYMENT_ROUTER_ADDRESS: ${PAYMENT_ROUTER_ADDRESS:-}
+      USDC_TOKEN_ADDRESS: ${USDC_TOKEN_ADDRESS:-0x036CbD53842c5426634e7929541eC2318f3dCF7e}
+      PAYMENT_MIN_CONFIRMATIONS: ${PAYMENT_MIN_CONFIRMATIONS:-2}
+      RPC_TIMEOUT_SECONDS: ${RPC_TIMEOUT_SECONDS:-10}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001}
+    command:
+      [
+        'sh',
+        '-c',
+        'alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000',
+      ]
+    ports:
+      - '8001:8000'
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/worker.Dockerfile
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-payrail}:${POSTGRES_PASSWORD:-payrail_dev_only}@postgres:5432/${POSTGRES_DB:-payrail}
+      BASE_SEPOLIA_RPC_URL: ${BASE_SEPOLIA_RPC_URL:-}
+      PAYMENT_ROUTER_ADDRESS: ${PAYMENT_ROUTER_ADDRESS:-}
+      USDC_TOKEN_ADDRESS: ${USDC_TOKEN_ADDRESS:-0x036CbD53842c5426634e7929541eC2318f3dCF7e}
+      PAYMENT_MIN_CONFIRMATIONS: ${PAYMENT_MIN_CONFIRMATIONS:-2}
+      RPC_TIMEOUT_SECONDS: ${RPC_TIMEOUT_SECONDS:-10}
+      PAYMENT_RECONCILE_INTERVAL_SECONDS: ${PAYMENT_RECONCILE_INTERVAL_SECONDS:-15}
+      PAYMENT_RECONCILE_BATCH_SIZE: ${PAYMENT_RECONCILE_BATCH_SIZE:-5}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    stop_grace_period: 300s
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'python',
+          '-c',
+          "import os,redis; assert redis.Redis.from_url(os.environ['REDIS_URL']).exists('payrail:worker:heartbeat')",
+        ]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8001}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8001}
+    ports:
+      - '3001:3000'
+    depends_on:
+      - api
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-payrail}
+      POSTGRES_USER: ${POSTGRES_USER:-payrail}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-payrail_dev_only}
+    ports:
+      - '127.0.0.1:5433:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-payrail} -d ${POSTGRES_DB:-payrail}',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '127.0.0.1:6380:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:

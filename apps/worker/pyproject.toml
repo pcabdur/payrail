@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "payrail-worker"
+version = "0.1.0"
+description = "PayRail background worker scaffold"
+requires-python = ">=3.11"
+dependencies = ["arq>=0.26,<1.0", "redis>=5.2,<6.0"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["payrail_worker*"]
